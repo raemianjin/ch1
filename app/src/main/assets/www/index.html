@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Console · 무료 AI API 멀티 채팅</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2a3343;
+    --txt:#e6edf3; --dim:#8b98a9; --faint:#5c6675;
+    --accent:#4ade80; --accent2:#38bdf8; --warn:#f59e0b; --bad:#ef4444; --good:#22c55e;
+    --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono","Cascadia Code",Consolas,monospace;
+    --sans:"Pretendard","Helvetica Neue",-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14px;
+    display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#2a3343;border-radius:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ===== TOP BAR ===== */
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:8px 14px;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{font-family:var(--mono);font-weight:700;letter-spacing:.5px;color:var(--accent);font-size:15px}
+  .logo span{color:var(--faint)}
+  .topctl{display:flex;align-items:center;gap:6px}
+  .topctl label{font-size:11px;color:var(--dim)}
+  select,input[type=text],input[type=password],input[type=number]{
+    background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:7px;padding:6px 9px;font-size:13px;outline:none}
+  select:focus,input:focus,textarea:focus{border-color:var(--accent2)}
+  select option.warn{color:#ff7b72}
+  .tabs{margin-left:auto;display:flex;gap:4px}
+  .tab{background:transparent;border:1px solid transparent;color:var(--dim);
+    padding:6px 14px;border-radius:8px;font-size:13px}
+  .tab.active{background:var(--panel2);border-color:var(--line);color:var(--txt)}
+  .switchwrap{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+  .toggle{position:relative;width:38px;height:20px;background:var(--line);border-radius:20px;
+    border:none;transition:.2s}
+  .toggle.on{background:var(--accent)}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
+    background:#fff;border-radius:50%;transition:.2s}
+  .toggle.on::after{transform:translateX(18px)}
+
+  /* status strip */
+  .status{width:100%;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:12px}
+  .status .now{font-family:var(--mono)}
+  .status .now b{color:var(--accent2)}
+  .status .warntag{color:#ff7b72;font-weight:600}
+  .bar{flex:1;min-width:160px;height:8px;background:#0b0f16;border-radius:6px;overflow:hidden;
+    border:1px solid var(--line);position:relative}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0;transition:width .3s}
+  .bar.danger>i{background:linear-gradient(90deg,var(--warn),var(--bad))}
+  .blink{animation:bk 1s steps(2,start) infinite}
+  @keyframes bk{50%{opacity:.25}}
+  .usagetxt{font-family:var(--mono);color:var(--dim);white-space:nowrap}
+
+  /* ===== MAIN ===== */
+  main{flex:1;overflow:hidden;position:relative}
+  .view{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+  .view.active{display:flex}
+
+  /* CHAT */
+  #chatLog{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:860px;width:fit-content;border-radius:12px;padding:11px 15px;line-height:1.55;
+    border:1px solid var(--line);white-space:normal;word-break:break-word}
+  .msg.user{align-self:flex-end;background:#16324a;border-color:#244b66}
+  .msg.assistant{align-self:flex-start;background:var(--panel)}
+  .msg .who{font-size:11px;color:var(--dim);margin-bottom:5px;font-family:var(--mono)}
+  .msg img{max-width:260px;border-radius:8px;margin:6px 6px 2px 0;border:1px solid var(--line)}
+  .divider{align-self:center;text-align:center;color:var(--warn);font-size:12px;
+    background:rgba(245,158,11,.08);border:1px dashed var(--warn);border-radius:8px;padding:6px 14px;max-width:680px}
+  .msg pre{background:#0b0f16;border:1px solid var(--line);border-radius:8px;padding:0;
+    overflow:auto;margin:8px 0;position:relative}
+  .msg pre code{display:block;padding:12px 14px;font-family:var(--mono);font-size:12.5px;color:#d6e2ee}
+  .codecopy{position:absolute;top:6px;right:6px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--dim);border-radius:6px;padding:3px 8px;font-size:11px}
+  .msg :not(pre)>code{background:#0b0f16;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:12.5px}
+  .msg a{color:var(--accent2)}
+  .typing{color:var(--dim);font-style:italic}
+
+  .composer{border-top:1px solid var(--line);background:var(--panel);padding:10px 14px}
+  .attachrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .attachrow:empty{display:none}
+  .chip{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:20px;padding:4px 10px;font-size:12px}
+  .chip img{width:26px;height:26px;border-radius:4px;object-fit:cover}
+  .chip button{background:none;border:none;color:var(--bad);font-size:14px;line-height:1}
+  .inputrow{display:flex;gap:10px;align-items:flex-end}
+  #chatInput{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px 12px;resize:none;min-height:46px;max-height:200px;font-size:14px;line-height:1.5}
+  .iconbtn{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
+    width:46px;height:46px;font-size:18px;display:flex;align-items:center;justify-content:center}
+  .sendbtn{background:var(--accent);border:none;color:#06210f;font-weight:700;border-radius:10px;
+    padding:0 20px;height:46px;font-size:14px}
+  .sendbtn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* LOG */
+  #logView{padding:18px 20px;overflow-y:auto}
+  h2.sec{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;
+    margin:0 0 12px;font-family:var(--mono)}
+  .usagegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-bottom:24px}
+  .ucard{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+  .ucard.warnprov{border-color:#5a2b2b}
+  .ucard h3{margin:0 0 3px;font-size:14px;display:flex;align-items:center;gap:7px}
+  .ucard .sub{font-size:11px;color:var(--faint);margin-bottom:9px;font-family:var(--mono)}
+  .ucard .privacy{color:#ff7b72;font-size:11px;font-weight:600}
+  .urow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;font-family:var(--mono)}
+  .urow .k{color:var(--dim)}
+  .modelblock{border-top:1px dashed var(--line);margin-top:8px;padding-top:7px}
+  .modelblock .mname{font-size:11px;color:var(--accent2);font-family:var(--mono);margin-bottom:3px}
+  .pct{font-weight:700}
+  .pct.lo{color:var(--good)} .pct.mid{color:var(--warn)} .pct.hi{color:var(--bad)}
+  .minibar{height:5px;background:#0b0f16;border-radius:4px;overflow:hidden;margin-top:5px;border:1px solid var(--line)}
+  .minibar>i{display:block;height:100%;background:var(--accent)}
+  .minibar>i.mid{background:var(--warn)} .minibar>i.hi{background:var(--bad)}
+
+  .logbox{background:#0b0f16;border:1px solid var(--line);border-radius:10px}
+  .logbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .logbar .gap{flex:1}
+  .sbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 11px;font-size:12px}
+  .sbtn.red{border-color:#5a2b2b;color:#ff9b93}
+  #logLines{font-family:var(--mono);font-size:12px;line-height:1.5;padding:10px 12px;max-height:46vh;overflow:auto;white-space:pre-wrap}
+  .ll{padding:1px 0}
+  .ll.err{color:#ff7b72} .ll.ok{color:var(--good)} .ll.sys{color:var(--accent2)} .ll.warn{color:var(--warn)}
+  .ll .t{color:var(--faint)}
+
+  /* SETTINGS */
+  #setView{padding:18px 20px;overflow-y:auto}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .pcard.warnprov{border-color:#5a2b2b}
+  .pcard .head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .pcard .head h3{margin:0;font-size:15px}
+  .pcard .head .pid{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .light{width:14px;height:14px;border-radius:50%;background:var(--faint);border:1px solid #0006;flex:none}
+  .light.ok{background:var(--good);box-shadow:0 0 8px var(--good)}
+  .light.bad{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  .light.test{background:var(--warn);animation:bk .6s infinite}
+  .frow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+  .frow label{font-size:12px;color:var(--dim);min-width:78px}
+  .frow input[type=text],.frow input[type=password]{flex:1;min-width:200px}
+  .frow input[type=number]{width:110px}
+  .frow select{flex:1;min-width:180px}
+  .savebtn{background:var(--accent2);border:none;color:#04222e;font-weight:700;border-radius:8px;padding:7px 16px;font-size:13px}
+  .testbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 14px;font-size:13px}
+  .hint{font-size:11px;color:var(--faint);margin-top:2px}
+  .hint a{color:var(--accent2)}
+  .limitrow{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+    border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-top:6px}
+  .limitrow .li{display:flex;flex-direction:column;gap:3px}
+  .limitrow .li span{font-size:10px;color:var(--faint);text-transform:uppercase}
+  .globalset{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+
+  /* EDITOR shell (preparing) */
+  #edView{padding:30px;overflow:auto}
+  .edshell{max-width:760px;margin:0 auto;text-align:center;color:var(--dim)}
+  .edshell .big{font-size:48px;margin-bottom:10px}
+  .edstub{display:grid;grid-template-columns:160px 1fr;gap:1px;background:var(--line);border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin-top:24px;height:240px;opacity:.45;text-align:left}
+  .edstub .files{background:var(--panel);padding:10px;font-family:var(--mono);font-size:12px}
+  .edstub .ed{background:#0b0f16;padding:10px;font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* TOAST */
+  #toasts{position:fixed;top:14px;right:14px;display:flex;flex-direction:column;gap:8px;z-index:9999}
+  .toast{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--dim);
+    border-radius:9px;padding:11px 15px;min-width:240px;max-width:360px;font-size:13px;
+    box-shadow:0 8px 30px #0008;animation:slidein .25s}
+  .toast.ok{border-left-color:var(--good)} .toast.bad{border-left-color:var(--bad)} .toast.warn{border-left-color:var(--warn)}
+  .toast b{display:block;margin-bottom:2px}
+  @keyframes slidein{from{transform:translateX(40px);opacity:0}}
+  .muted{color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AI<span>·</span>CONSOLE</div>
+  <div class="topctl">
+    <label>제공자</label>
+    <select id="provSelect"></select>
+  </div>
+  <div class="topctl">
+    <label>모델</label>
+    <select id="modelSelect"></select>
+  </div>
+  <div class="switchwrap">
+    <span>자동(랜덤)</span>
+    <button class="toggle" id="autoToggle" title="순서대로 자동 전환"></button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-view="chat">채팅</button>
+    <button class="tab" data-view="log">로그</button>
+    <button class="tab" data-view="set">설정</button>
+    <button class="tab" data-view="ed" title="향후 추가 예정">에디터</button>
+  </div>
+
+  <div class="status">
+    <span class="now" id="nowUsing">현재 사용: <b>—</b></span>
+    <span class="warntag" id="nowWarn" style="display:none">⚠ 데이터 유출 주의</span>
+    <div class="bar" id="usageBar"><i></i></div>
+    <span class="usagetxt" id="usageTxt">사용량 0 / 0 (0%)</span>
+  </div>
+</header>
+
+<main>
+  <!-- CHAT -->
+  <section class="view active" id="chatView">
+    <div id="chatLog"></div>
+    <div class="composer">
+      <div class="attachrow" id="attachRow"></div>
+      <div class="inputrow">
+        <input type="file" id="fileInput" multiple hidden>
+        <button class="iconbtn" id="attachBtn" title="파일/이미지 첨부">📎</button>
+        <textarea id="chatInput" placeholder="메시지를 입력하세요. 이미지·파일 붙여넣기(Ctrl+V) 가능. Enter 전송 / Shift+Enter 줄바꿈"></textarea>
+        <button class="sendbtn" id="sendBtn">전송</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section class="view" id="logView">
+    <h2 class="sec">당일 사용량 · 한도 · 예상 소진율</h2>
+    <div class="usagegrid" id="usageGrid"></div>
+    <h2 class="sec">로그 (최대 1,000줄)</h2>
+    <div class="logbox">
+      <div class="logbar">
+        <span id="logCount">0 줄</span>
+        <div class="gap"></div>
+        <button class="sbtn" id="copyAll">전체 복사</button>
+        <button class="sbtn" id="copy100">최근 100개 복사</button>
+        <button class="sbtn red" id="clearLog">로그 지우기</button>
+      </div>
+      <div id="logLines"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="setView">
+    <div class="globalset">
+      <h2 class="sec" style="margin-bottom:8px">전역 설정</h2>
+      <div class="frow">
+        <label>한도 경고 %</label>
+        <input type="number" id="warnPct" min="10" max="99" value="80" style="width:90px">
+        <span class="hint">현재 AI가 이 비율을 넘으면 상단 사용량 표시가 반짝입니다.</span>
+      </div>
+      <div class="frow">
+        <label>인코딩 규칙</label>
+        <button class="toggle" id="encToggle"></button>
+        <span class="hint">켜면 응답의 <b>코드 블록</b>을 인코딩해 <b>.txt</b>로 복사/저장합니다. 규칙: 줄 앞에 <b>÷</b>, 공백→<b>{</b>, 문자 <b>{</b>→<b>♡</b>. (복원: ÷ 제거 → ♡→{ → {→공백)</span>
+      </div>
+      <div class="frow">
+        <label>자동 전환 순서</label>
+        <span class="hint">각 제공자 카드의 "순서" 값이 낮을수록 먼저 사용됩니다. <b>0 = 제외</b>(채팅 선택 시 비활성화). 한도 도달 시 다음 순번으로 자동 전환됩니다.</span>
+      </div>
+      <div class="frow">
+        <button class="sbtn red" id="resetUsage">오늘 사용량 초기화</button>
+        <span class="hint">사용량은 매일 자정 기준으로 자동 초기화됩니다.</span>
+      </div>
+    </div>
+    <div id="setCards"></div>
+  </section>
+
+  <!-- EDITOR (shell only) -->
+  <section class="view" id="edView">
+    <div class="edshell">
+      <div class="big">🧩</div>
+      <h2 style="color:var(--txt)">코드 에디터 (준비 중)</h2>
+      <p>VS Code 스타일 에디터 + AI 코딩 지원이 향후 추가될 영역입니다.<br>
+      지금은 내부 골격(파일 트리 · 편집 패널 · AI 연동 훅)만 준비되어 있습니다.<br>
+      추가 개발을 요청하시면 이 자리에서 확장합니다.</p>
+      <div class="edstub">
+        <div class="files">📁 src/<br>&nbsp;&nbsp;├ index.js<br>&nbsp;&nbsp;├ app.js<br>&nbsp;&nbsp;└ styles.css<br>📁 lib/</div>
+        <div class="ed">// editor surface (stub)<br>// window.__editorModule 로 연동 예정<br>function init(){ /* TODO */ }</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   PROVIDER DEFINITIONS
+   limits 는 사용자가 설정에서 수정 가능. 조사 기반 기본값(2026 기준, 변동 가능).
+   aggregation: 'account' = 계정 단위 합산 / 'model' = 모델별 구분
+   primary: 'requests' | 'tokens'  (소진율 계산 기준)
+   ========================================================= */
+const PROVIDERS = [
+  {
+    id:"gemini", name:"Google AI Studio (Gemini)", warn:true,
+    privacy:"무료 등급 입력/출력이 모델 학습에 사용될 수 있음 (데이터 유출 위험)",
+    keyUrl:"https://aistudio.google.com/apikey",
+    aggregation:"model", primary:"requests", kind:"gemini", vision:true,
+    models:[
+      {id:"gemini-2.5-flash", rpd:250, tpd:0},
+      {id:"gemini-2.5-flash-lite", rpd:1000, tpd:0},
+      {id:"gemini-2.0-flash", rpd:200, tpd:0}
+    ]
+  },
+  {
+    id:"groq", name:"Groq API", warn:false,
+    keyUrl:"https://console.groq.com/keys",
+    aggregation:"model", primary:"requests", kind:"openai", vision:true,
+    base:"https://api.groq.com/openai/v1/chat/completions",
+    models:[
+      {id:"llama-3.3-70b-versatile", rpd:1000, tpd:0},
+      {id:"llama-3.1-8b-instant", rpd:14400, tpd:0},
+      {id:"openai/gpt-oss-120b", rpd:1000, tpd:0}
+    ]
+  },
+  {
+    id:"cerebras", name:"Cerebras API", warn:false,
+    keyUrl:"https://cloud.cerebras.ai",
+    aggregation:"account", primary:"tokens", kind:"openai", vision:false,
+    base:"https://api.cerebras.ai/v1/chat/completions",
+    accountLimit:{rpd:0, tpd:1000000}, // 1M tokens/day 공유
+    models:[
+      {id:"llama-3.3-70b"}, {id:"llama3.1-8b"},
+      {id:"qwen-3-32b"}, {id:"gpt-oss-120b"}
+    ]
+  },
+  {
+    id:"openrouter", name:"OpenRouter", warn:true,
+    privacy:"여러 외부 제공자로 요청이 중계됨 (데이터 유출 위험)",
+    keyUrl:"https://openrouter.ai/keys",
+    aggregation:"account", primary:"requests", kind:"openai", vision:true,
+    base:"https://openrouter.ai/api/v1/chat/completions",
+    accountLimit:{rpd:50, tpd:0}, // 무료 50/day (크레딧 $10시 1000/day)
+    models:[
+      {id:"deepseek/deepseek-r1:free"},
+      {id:"meta-llama/llama-3.3-70b-instruct:free"},
+      {id:"qwen/qwen3-coder:free"},
+      {id:"google/gemma-3-27b-it:free"}
+    ]
+  },
+  {
+    id:"mistral", name:"Mistral AI", warn:false,
+    keyUrl:"https://console.mistral.ai/api-keys",
+    aggregation:"account", primary:"tokens", kind:"openai", vision:false,
+    base:"https://api.mistral.ai/v1/chat/completions",
+    accountLimit:{rpd:0, tpd:33000000}, // 월 10억 토큰 ≈ 일 환산
+    models:[
+      {id:"mistral-small-latest"}, {id:"open-mistral-nemo"},
+      {id:"mistral-large-latest"}
+    ]
+  },
+  {
+    id:"sambanova", name:"SambaNova Cloud", warn:false,
+    keyUrl:"https://cloud.sambanova.ai/apis",
+    aggregation:"account", primary:"requests", kind:"openai", vision:false,
+    base:"https://api.sambanova.ai/v1/chat/completions",
+    accountLimit:{rpd:1000, tpd:0},
+    models:[
+      {id:"Meta-Llama-3.3-70B-Instruct"},
+      {id:"Meta-Llama-3.1-8B-Instruct"},
+      {id:"Qwen2.5-72B-Instruct"}
+    ]
+  },
+  {
+    id:"github", name:"GitHub Models", warn:false,
+    keyUrl:"https://github.com/settings/personal-access-tokens",
+    aggregation:"account", primary:"requests", kind:"openai", vision:true,
+    base:"https://models.github.ai/inference/chat/completions",
+    accountLimit:{rpd:150, tpd:0},
+    models:[
+      {id:"openai/gpt-4o-mini"}, {id:"openai/gpt-4o"},
+      {id:"meta/Llama-3.3-70B-Instruct"}, {id:"mistral-ai/Mistral-Nemo"}
+    ]
+  },
+  {
+    id:"cloudflare", name:"Cloudflare Workers AI", warn:false,
+    keyUrl:"https://dash.cloudflare.com/profile/api-tokens",
+    aggregation:"account", primary:"requests", kind:"cloudflare", vision:false,
+    needsAccount:true,
+    accountLimit:{rpd:300, tpd:0}, // ≈ 10,000 neurons/day
+    models:[
+      {id:"@cf/meta/llama-3.1-8b-instruct"},
+      {id:"@cf/mistral/mistral-7b-instruct-v0.1"},
+      {id:"@cf/meta/llama-3.3-70b-instruct-fp8-fast"}
+    ]
+  },
+  {
+    id:"huggingface", name:"Hugging Face Serverless Inference", warn:false,
+    keyUrl:"https://huggingface.co/settings/tokens",
+    aggregation:"account", primary:"requests", kind:"openai", vision:false,
+    base:"https://router.huggingface.co/v1/chat/completions",
+    accountLimit:{rpd:200, tpd:0},
+    models:[
+      {id:"meta-llama/Llama-3.1-8B-Instruct"},
+      {id:"Qwen/Qwen2.5-7B-Instruct"},
+      {id:"mistralai/Mistral-7B-Instruct-v0.3"}
+    ]
+  },
+  {
+    id:"cohere", name:"Cohere Free API", warn:false,
+    keyUrl:"https://dashboard.cohere.com/api-keys",
+    aggregation:"account", primary:"requests", kind:"cohere", vision:false,
+    base:"https://api.cohere.com/v2/chat",
+    accountLimit:{rpd:1000, tpd:0}, // 트라이얼 월 1000 ≈ 일 환산 기준
+    models:[
+      {id:"command-r-plus-08-2024"}, {id:"command-r-08-2024"},
+      {id:"command-a-03-2025"}
+    ]
+  }
+];
+const PROV = {}; PROVIDERS.forEach(p=>PROV[p.id]=p);
+
+/* =========================================================
+   STORAGE
+   ========================================================= */
+const LS = {
+  cfg:"aiconsole.cfg.v1",       // {prov:{key,account,model,order,limits:{...},modelLimits:{}}}
+  usage:"aiconsole.usage.v1",   // {date, prov:{requests,tokens,models:{}}}
+  logs:"aiconsole.logs.v1",
+  global:"aiconsole.global.v1", // {warnPct, autoMode, currentProv, currentModel}
+};
+function load(k,def){ try{ return JSON.parse(localStorage.getItem(k))||def }catch(e){ return def } }
+function save(k,v){ localStorage.setItem(k, JSON.stringify(v)) }
+
+let cfg = load(LS.cfg, {});
+let glob = load(LS.global, {warnPct:80, autoMode:false, currentProv:"gemini", currentModel:null, encodeCode:false});
+if(glob.encodeCode===undefined) glob.encodeCode=false;
+let logs = load(LS.logs, []);
+
+// ensure per-provider config
+PROVIDERS.forEach(p=>{
+  if(!cfg[p.id]) cfg[p.id]={};
+  const c=cfg[p.id];
+  if(c.key===undefined) c.key="";
+  if(c.account===undefined) c.account="";
+  if(c.order===undefined) c.order=PROVIDERS.indexOf(p)+1;
+  if(!c.model) c.model=p.models[0].id;
+  if(!c.limits) c.limits = p.aggregation==="account"
+      ? {rpd:p.accountLimit.rpd, tpd:p.accountLimit.tpd} : {};
+  if(!c.modelLimits) c.modelLimits={};
+  if(p.aggregation==="model"){
+    p.models.forEach(m=>{
+      if(!c.modelLimits[m.id]) c.modelLimits[m.id]={rpd:m.rpd||0, tpd:m.tpd||0};
+    });
+  }
+});
+saveCfg();
+function saveCfg(){ save(LS.cfg, cfg) }
+function saveGlob(){ save(LS.global, glob) }
+
+/* =========================================================
+   USAGE (daily reset)
+   ========================================================= */
+function today(){ return new Date().toISOString().slice(0,10) }
+let usage = load(LS.usage, null);
+function freshUsage(){
+  const u={date:today()};
+  PROVIDERS.forEach(p=> u[p.id]={requests:0,tokens:0,models:{}});
+  return u;
+}
+if(!usage || usage.date!==today()){ usage=freshUsage(); save(LS.usage,usage) }
+PROVIDERS.forEach(p=>{ if(!usage[p.id]) usage[p.id]={requests:0,tokens:0,models:{}} });
+function saveUsage(){ save(LS.usage, usage) }
+
+function recordUsage(pid, model, tokens){
+  if(usage.date!==today()){ usage=freshUsage() }
+  const u=usage[pid];
+  u.requests++; u.tokens+=tokens;
+  if(!u.models[model]) u.models[model]={requests:0,tokens:0};
+  u.models[model].requests++; u.models[model].tokens+=tokens;
+  saveUsage();
+}
+
+/* limit info for a provider+model -> {used, max, pct, type} */
+function limitInfo(pid, model){
+  const p=PROV[pid], c=cfg[pid], u=usage[pid];
+  if(p.aggregation==="account"){
+    const lim=c.limits;
+    if(p.primary==="tokens"){
+      const max=lim.tpd||0, used=u.tokens;
+      return {used, max, pct: max? Math.min(100,used/max*100):0, type:"토큰"};
+    }else{
+      const max=lim.rpd||0, used=u.requests;
+      return {used, max, pct: max? Math.min(100,used/max*100):0, type:"요청"};
+    }
+  }else{ // per-model
+    const lim=(c.modelLimits[model]||{});
+    const mu=(u.models[model]||{requests:0,tokens:0});
+    if(p.primary==="tokens"){
+      const max=lim.tpd||0, used=mu.tokens;
+      return {used,max,pct:max?Math.min(100,used/max*100):0,type:"토큰"};
+    }else{
+      const max=lim.rpd||0, used=mu.requests;
+      return {used,max,pct:max?Math.min(100,used/max*100):0,type:"요청"};
+    }
+  }
+}
+function atLimit(pid, model){ const i=limitInfo(pid,model); return i.max>0 && i.used>=i.max }
+
+/* =========================================================
+   LOGGING
+   ========================================================= */
+function logLine(type, text){
+  const t=new Date().toLocaleTimeString("ko-KR",{hour12:false});
+  logs.push({t, type, text});
+  if(logs.length>1000) logs=logs.slice(logs.length-1000);
+  save(LS.logs, logs);
+  if(curView==="log") renderLogLines();
+}
+
+/* =========================================================
+   TOASTS
+   ========================================================= */
+function toast(kind, title, msg){
+  const el=document.createElement("div");
+  el.className="toast "+kind;
+  el.innerHTML="<b>"+esc(title)+"</b>"+(msg?"<span class='muted'>"+esc(msg)+"</span>":"");
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(()=>{ el.style.transition="opacity .4s"; el.style.opacity="0";
+    setTimeout(()=>el.remove(),400) }, 4200);
+}
+function esc(s){ return (s==null?"":""+s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
+
+/* =========================================================
+   PROVIDER CALLS (adapters)
+   ========================================================= */
+function approxTokens(str){ return Math.ceil((str||"").length/4) }
+
+/* encoding rule (optional toggle) */
+function encodeCode(text){
+  return (text||"").split("\n").map(l=> "\u00f7"+ l.replace(/\{/g,"\u2661").replace(/ /g,"{")).join("\n");
+}
+function downloadTxt(name, content){
+  const blob=new Blob([content],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+// build request from generic message list + attachments
+function buildRequest(pid, model, messages){
+  const p=PROV[pid], c=cfg[pid];
+  if(p.kind==="gemini"){
+    const contents = messages.map(m=>{
+      const parts=[];
+      if(m.text) parts.push({text:m.text});
+      (m.images||[]).forEach(img=> parts.push({inline_data:{mime_type:img.mime, data:img.b64}}));
+      return {role: m.role==="assistant"?"model":"user", parts};
+    });
+    return {
+      url:`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(c.key)}`,
+      opts:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents})}
+    };
+  }
+  if(p.kind==="cloudflare"){
+    return {
+      url:`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(c.account)}/ai/run/${model}`,
+      opts:{method:"POST",headers:{"Authorization":"Bearer "+c.key,"Content-Type":"application/json"},
+        body:JSON.stringify({messages:messages.map(m=>({role:m.role,content:m.text||""}))})}
+    };
+  }
+  if(p.kind==="cohere"){
+    return {
+      url:p.base,
+      opts:{method:"POST",headers:{"Authorization":"Bearer "+c.key,"Content-Type":"application/json"},
+        body:JSON.stringify({model, messages:messages.map(m=>({role:m.role,content:m.text||""}))})}
+    };
+  }
+  // openai-compatible (groq, cerebras, openrouter, mistral, sambanova, github, hf)
+  const msgs = messages.map(m=>{
+    if(p.vision && (m.images||[]).length){
+      const content=[];
+      if(m.text) content.push({type:"text",text:m.text});
+      (m.images||[]).forEach(img=> content.push({type:"image_url",image_url:{url:`data:${img.mime};base64,${img.b64}`}}));
+      return {role:m.role, content};
+    }
+    return {role:m.role, content:m.text||""};
+  });
+  const headers={"Authorization":"Bearer "+c.key,"Content-Type":"application/json"};
+  if(pid==="openrouter"){ headers["HTTP-Referer"]="https://localhost"; headers["X-Title"]="AI Console"; }
+  return {url:p.base, opts:{method:"POST",headers,body:JSON.stringify({model, messages:msgs})}};
+}
+
+function parseResponse(pid, data){
+  const p=PROV[pid];
+  let text="", tokens=0;
+  if(p.kind==="gemini"){
+    const cand=(data.candidates&&data.candidates[0]);
+    text=(cand&&cand.content&&cand.content.parts||[]).map(x=>x.text||"").join("");
+    tokens=(data.usageMetadata&&data.usageMetadata.totalTokenCount)||0;
+  }else if(p.kind==="cloudflare"){
+    text=(data.result&&(data.result.response||data.result.text))||"";
+  }else if(p.kind==="cohere"){
+    text=(data.message&&data.message.content&&data.message.content.map(x=>x.text||"").join(""))||"";
+    const us=data.usage&&data.usage.tokens; if(us) tokens=(us.input_tokens||0)+(us.output_tokens||0);
+  }else{
+    const ch=(data.choices&&data.choices[0]);
+    text=(ch&&ch.message&&ch.message.content)||"";
+    if(Array.isArray(text)) text=text.map(x=>x.text||"").join("");
+    tokens=(data.usage&&data.usage.total_tokens)||0;
+  }
+  return {text, tokens};
+}
+
+function extractError(pid, data){
+  if(!data) return "응답 없음";
+  if(data.error){ return typeof data.error==="string"?data.error:(data.error.message||JSON.stringify(data.error)) }
+  if(data.errors){ return JSON.stringify(data.errors) }
+  if(data.message && !data.choices && !data.candidates) return data.message;
+  if(data.detail) return JSON.stringify(data.detail);
+  return null;
+}
+
+async function callProvider(pid, model, messages){
+  const c=cfg[pid], p=PROV[pid];
+  if(!c.key) throw {kind:"nokey", msg:"API 키가 설정되지 않았습니다."};
+  if(p.needsAccount && !c.account) throw {kind:"nokey", msg:"Account ID가 설정되지 않았습니다."};
+  const req=buildRequest(pid, model, messages);
+  let res, data;
+  try{
+    res=await fetch(req.url, req.opts);
+  }catch(e){
+    throw {kind:"network", msg:"네트워크/CORS 오류: "+e.message+" (브라우저에서 직접 호출이 차단되었을 수 있습니다)"};
+  }
+  const txt=await res.text();
+  try{ data=JSON.parse(txt) }catch(e){ data={raw:txt} }
+  if(!res.ok){
+    const em=extractError(pid,data) || ("HTTP "+res.status);
+    throw {kind: res.status===429?"limit":"http", status:res.status, msg:em};
+  }
+  const parsed=parseResponse(pid, data);
+  const err=extractError(pid, data);
+  if(!parsed.text && err) throw {kind:"http", msg:err};
+  return parsed;
+}
+
+/* =========================================================
+   ACTIVE PROVIDER / AUTO-SWITCH
+   ========================================================= */
+function enabledOrdered(){
+  return PROVIDERS
+    .filter(p=> (cfg[p.id].order||0) > 0)            // 0 = 제외
+    .sort((a,b)=> cfg[a.id].order - cfg[b.id].order);
+}
+// pick first ordered provider that has key and is not at limit
+function pickAuto(){
+  const list=enabledOrdered();
+  for(const p of list){
+    const c=cfg[p.id];
+    if(!c.key) continue;
+    if(p.needsAccount && !c.account) continue;
+    if(!atLimit(p.id, c.model)) return {pid:p.id, model:c.model};
+  }
+  // all at limit -> still return first with key
+  for(const p of list){ if(cfg[p.id].key) return {pid:p.id, model:cfg[p.id].model}; }
+  return null;
+}
+
+let active = {pid: glob.currentProv||"gemini", model: glob.currentModel||PROV[glob.currentProv||"gemini"].models[0].id};
+function setActive(pid, model, fromAuto){
+  const changed = active.pid!==pid || active.model!==model;
+  if(changed){
+    insertDivider(pid, model);
+    contextStart = chatMessages.length; // 새 컨텍스트 시작
+  }
+  active={pid, model};
+  glob.currentProv=pid; glob.currentModel=model; saveGlob();
+  syncTopSelectors();
+  updateStatus();
+}
+
+/* =========================================================
+   CHAT STATE
+   ========================================================= */
+let chatMessages=[]; // {role:'user'|'assistant', text, images:[{mime,b64,name}], prov, model}
+let contextStart=0;  // index from which context is sent to current provider
+let pendingAttachments=[]; // {mime,b64,name,isImage,text}
+
+function insertDivider(pid, model){
+  if(!chatMessages.length) return;
+  const el=document.createElement("div");
+  el.className="divider";
+  el.textContent=`AI가 ${PROV[pid].name} · ${model} (으)로 변경되었습니다. 이전 대화 맥락은 새 AI에 전달되지 않습니다.`;
+  document.getElementById("chatLog").appendChild(el);
+  scrollChat();
+}
+
+/* =========================================================
+   RENDER: chat
+   ========================================================= */
+const chatLogEl=document.getElementById("chatLog");
+function scrollChat(){ chatLogEl.scrollTop=chatLogEl.scrollHeight }
+
+function renderMessage(m){
+  const el=document.createElement("div");
+  el.className="msg "+m.role;
+  let html="<div class='who'>"+(m.role==="user"?"나":esc(PROV[m.prov]?PROV[m.prov].name:"AI")+(m.model?" · "+esc(m.model):""))+"</div>";
+  (m.images||[]).forEach(img=>{ html+="<img src='data:"+img.mime+";base64,"+img.b64+"' alt='"+esc(img.name||"")+"'>"; });
+  html+=mdToHtml(m.text||"");
+  el.innerHTML=html;
+  // code copy buttons
+  // code copy buttons (honor encoding toggle)
+  el.querySelectorAll("pre").forEach(pre=>{
+    const codeEl=pre.querySelector("code");
+    const getCode=()=> (codeEl?codeEl.textContent:pre.textContent);
+    if(glob.encodeCode){
+      const b1=document.createElement("button"); b1.className="codecopy"; b1.textContent="\u00f7 복사";
+      b1.onclick=()=>{ navigator.clipboard.writeText(encodeCode(getCode())); b1.textContent="복사됨"; setTimeout(()=>b1.textContent="\u00f7 복사",1200) };
+      const b2=document.createElement("button"); b2.className="codecopy"; b2.style.right="74px"; b2.textContent="\u00f7 .txt";
+      b2.onclick=()=> downloadTxt("code-"+Date.now()+".txt", encodeCode(getCode()));
+      pre.appendChild(b1); pre.appendChild(b2);
+    }else{
+      const b=document.createElement("button"); b.className="codecopy"; b.textContent="복사";
+      b.onclick=()=>{ navigator.clipboard.writeText(getCode()); b.textContent="복사됨"; setTimeout(()=>b.textContent="복사",1200) };
+      pre.appendChild(b);
+    }
+  });
+  chatLogEl.appendChild(el);
+  scrollChat();
+  return el;
+}
+
+/* minimal markdown -> html */
+function mdToHtml(src){
+  src=src||"";
+  const blocks=[];
+  src=src.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
+    blocks.push("<pre><code>"+esc(code.replace(/\n$/,""))+"</code></pre>"); return "\u0000B"+(blocks.length-1)+"\u0000";
+  });
+  src=esc(src);
+  src=src.replace(/`([^`]+)`/g,"<code>$1</code>");
+  src=src.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  src=src.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g,"<i>$1</i>");
+  src=src.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,"<a href='$2' target='_blank' rel='noopener'>$1</a>");
+  // headings & lists line-based
+  src=src.split("\n").map(line=>{
+    let h=line.match(/^(#{1,4})\s+(.*)$/);
+    if(h) return "<h"+(h[1].length+2)+">"+h[2]+"</h"+(h[1].length+2)+">";
+    if(/^\s*[-*]\s+/.test(line)) return "<li>"+line.replace(/^\s*[-*]\s+/,"")+"</li>";
+    if(/^\s*\d+\.\s+/.test(line)) return "<li>"+line.replace(/^\s*\d+\.\s+/,"")+"</li>";
+    return line;
+  }).join("\n");
+  src=src.replace(/(<li>[\s\S]*?<\/li>)(?!\n<li>)/g,"<ul>$1</ul>");
+  src=src.replace(/\n{2,}/g,"<br><br>").replace(/\n/g,"<br>");
+  src=src.replace(/\u0000B(\d+)\u0000/g,(_,i)=>blocks[+i]);
+  src=src.replace(/<br>\s*(<pre>)/g,"$1").replace(/(<\/pre>)\s*<br>/g,"$1");
+  src=src.replace(/<br>\s*(<\/?(ul|h\d))/g,"$1").replace(/(<\/(ul|h\d)>)\s*<br>/g,"$1");
+  return src;
+}
+
+/* =========================================================
+   SEND
+   ========================================================= */
+const sendBtn=document.getElementById("sendBtn");
+const chatInput=document.getElementById("chatInput");
+
+async function send(){
+  const text=chatInput.value.trim();
+  if(!text && !pendingAttachments.length) return;
+
+  // determine provider (auto vs manual)
+  if(glob.autoMode){
+    const pick=pickAuto();
+    if(!pick){ toast("bad","사용 가능한 AI 없음","키가 설정되고 순서>0 인 제공자가 없습니다."); return; }
+    setActive(pick.pid, pick.model, true);
+  }
+  const pid=active.pid, model=active.model;
+  const c=cfg[pid];
+  if(!c.key){ toast("bad","키 없음", PROV[pid].name+" 의 API 키를 설정에서 입력하세요."); switchView("set"); return; }
+
+  // compose user message
+  const images=pendingAttachments.filter(a=>a.isImage).map(a=>({mime:a.mime,b64:a.b64,name:a.name}));
+  const fileTexts=pendingAttachments.filter(a=>!a.isImage)
+      .map(a=>`\n\n[첨부 파일: ${a.name}]\n\`\`\`\n${a.text}\n\`\`\``).join("");
+  const userMsg={role:"user", text:text+fileTexts, images, prov:pid, model};
+  chatMessages.push(userMsg);
+  renderMessage(userMsg);
+  chatInput.value=""; chatInput.style.height="auto";
+  pendingAttachments=[]; renderAttachments();
+
+  // typing placeholder
+  const ph=document.createElement("div");
+  ph.className="msg assistant";
+  ph.innerHTML="<div class='who'>"+esc(PROV[pid].name)+" · "+esc(model)+"</div><div class='typing'>응답 생성 중…</div>";
+  chatLogEl.appendChild(ph); scrollChat();
+
+  sendBtn.disabled=true;
+  // context = messages since contextStart (different AI => fresh context)
+  const ctx=chatMessages.slice(contextStart).map(m=>({role:m.role, text:m.text, images:m.images}));
+
+  const estIn=approxTokens(ctx.map(m=>m.text).join(" "));
+  logLine("sys", `요청 → ${PROV[pid].name} / ${model} (입력 약 ${estIn} 토큰)`);
+
+  try{
+    const out=await callProvider(pid, model, ctx);
+    ph.remove();
+    const tokens = out.tokens || (estIn + approxTokens(out.text));
+    recordUsage(pid, model, tokens);
+    const aMsg={role:"assistant", text:out.text, prov:pid, model};
+    chatMessages.push(aMsg);
+    renderMessage(aMsg);
+    logLine("ok", `응답 ← ${PROV[pid].name} / ${model} (사용 약 ${tokens} 토큰)`);
+    updateStatus(); if(curView==="log") renderUsage();
+  }catch(err){
+    ph.remove();
+    const msg=err.msg||String(err);
+    logLine("err", `오류 [${PROV[pid].name}/${model}] ${err.kind||""}: ${msg}`);
+    toast("bad", PROV[pid].name+" 호출 실패", msg.slice(0,140));
+    // auto-switch on limit
+    if(glob.autoMode && (err.kind==="limit")){
+      // mark this provider as exhausted for today by bumping to its max
+      forceMaxUsage(pid, model);
+      const pick=pickAuto();
+      if(pick && (pick.pid!==pid || pick.model!==model)){
+        toast("warn","자동 전환", PROV[pick.pid].name+" (으)로 전환합니다.");
+        setActive(pick.pid, pick.model, true);
+        sendBtn.disabled=false;
+        // 재시도: 사용자가 다시 전송하도록 안내 (자동 재전송은 컨텍스트 단절되므로 X)
+        const note={role:"assistant",text:`_${PROV[pid].name} 한도 도달 → ${PROV[pick.pid].name} 로 전환되었습니다. 메시지를 다시 보내주세요._`,prov:pick.pid,model:pick.model};
+        chatMessages.push(note); renderMessage(note);
+      }
+    }
+  }
+  sendBtn.disabled=false;
+  updateStatus();
+}
+function forceMaxUsage(pid, model){
+  const p=PROV[pid], c=cfg[pid], u=usage[pid];
+  if(p.aggregation==="account"){
+    if(p.primary==="tokens") u.tokens=Math.max(u.tokens, c.limits.tpd||0);
+    else u.requests=Math.max(u.requests, c.limits.rpd||0);
+  }else{
+    if(!u.models[model]) u.models[model]={requests:0,tokens:0};
+    const lim=c.modelLimits[model]||{};
+    if(p.primary==="tokens") u.models[model].tokens=Math.max(u.models[model].tokens, lim.tpd||0);
+    else u.models[model].requests=Math.max(u.models[model].requests, lim.rpd||0);
+  }
+  saveUsage();
+}
+
+/* =========================================================
+   STATUS BAR
+   ========================================================= */
+function updateStatus(){
+  const pid=active.pid, model=active.model, p=PROV[pid];
+  document.getElementById("nowUsing").innerHTML="현재 사용: <b>"+esc(p.name)+" · "+esc(model)+"</b>"+(glob.autoMode?" <span class='muted'>[자동]</span>":"");
+  const wt=document.getElementById("nowWarn");
+  wt.style.display = p.warn ? "" : "none";
+  const info=limitInfo(pid, model);
+  const bar=document.getElementById("usageBar"), fill=bar.firstElementChild;
+  fill.style.width=info.pct+"%";
+  bar.classList.toggle("danger", info.pct>=glob.warnPct);
+  const near = info.max>0 && info.pct>=glob.warnPct;
+  bar.classList.toggle("blink", near);
+  document.getElementById("usageTxt").classList.toggle("blink", near);
+  document.getElementById("usageTxt").textContent=
+    `${info.type} ${info.used.toLocaleString()} / ${info.max?info.max.toLocaleString():"∞"} (${info.pct.toFixed(1)}%)`;
+}
+
+/* =========================================================
+   TOP SELECTORS
+   ========================================================= */
+const provSelect=document.getElementById("provSelect");
+const modelSelect=document.getElementById("modelSelect");
+function buildProvSelect(){
+  provSelect.innerHTML="";
+  PROVIDERS.forEach(p=>{
+    const o=document.createElement("option");
+    o.value=p.id; o.textContent=p.name+(p.warn?"  ⚠":"");
+    if(p.warn) o.className="warn";
+    if((cfg[p.id].order||0)===0){ o.disabled=true; o.textContent+="  (제외됨)"; }
+    provSelect.appendChild(o);
+  });
+  provSelect.value=active.pid;
+}
+function buildModelSelect(){
+  const p=PROV[provSelect.value];
+  modelSelect.innerHTML="";
+  p.models.forEach(m=>{
+    const o=document.createElement("option"); o.value=m.id; o.textContent=m.id; modelSelect.appendChild(o);
+  });
+  modelSelect.value = (active.pid===p.id)? active.model : cfg[p.id].model;
+}
+function syncTopSelectors(){
+  buildProvSelect(); buildModelSelect();
+  provSelect.style.color = PROV[active.pid].warn ? "#ff7b72" : "var(--txt)";
+}
+provSelect.onchange=()=>{
+  const pid=provSelect.value;
+  if((cfg[pid].order||0)===0){ syncTopSelectors(); return; }
+  glob.autoMode=false; document.getElementById("autoToggle").classList.remove("on"); saveGlob();
+  cfg[pid].model=cfg[pid].model||PROV[pid].models[0].id;
+  buildModelSelect();
+  setActive(pid, modelSelect.value);
+};
+modelSelect.onchange=()=>{
+  const pid=provSelect.value;
+  cfg[pid].model=modelSelect.value; saveCfg();
+  setActive(pid, modelSelect.value);
+};
+
+document.getElementById("autoToggle").onclick=function(){
+  glob.autoMode=!glob.autoMode; this.classList.toggle("on", glob.autoMode); saveGlob();
+  if(glob.autoMode){
+    const pick=pickAuto();
+    if(pick) setActive(pick.pid, pick.model, true);
+    else toast("warn","자동 모드","사용 가능한 제공자가 없습니다 (키/순서 확인).");
+  }
+  updateStatus();
+};
+
+/* =========================================================
+   ATTACHMENTS (file + paste)
+   ========================================================= */
+const attachRow=document.getElementById("attachRow");
+function renderAttachments(){
+  attachRow.innerHTML="";
+  pendingAttachments.forEach((a,i)=>{
+    const chip=document.createElement("div"); chip.className="chip";
+    chip.innerHTML=(a.isImage?"<img src='data:"+a.mime+";base64,"+a.b64+"'>":"📄 ")+
+      "<span>"+esc(a.name)+"</span><button>×</button>";
+    chip.querySelector("button").onclick=()=>{ pendingAttachments.splice(i,1); renderAttachments() };
+    attachRow.appendChild(chip);
+  });
+}
+function fileToB64(file){
+  return new Promise((res,rej)=>{ const r=new FileReader();
+    r.onload=()=>res(r.result.split(",")[1]); r.onerror=rej; r.readAsDataURL(file); });
+}
+async function addFile(file){
+  const isImage=file.type.startsWith("image/");
+  if(isImage){
+    const b64=await fileToB64(file);
+    pendingAttachments.push({mime:file.type,b64,name:file.name,isImage:true});
+  }else{
+    const text=await file.text();
+    pendingAttachments.push({name:file.name,isImage:false,text:text.slice(0,20000)});
+  }
+  renderAttachments();
+}
+document.getElementById("attachBtn").onclick=()=>document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange=async e=>{ for(const f of e.target.files) await addFile(f); e.target.value=""; };
+chatInput.addEventListener("paste", async e=>{
+  const items=e.clipboardData&&e.clipboardData.items; if(!items) return;
+  for(const it of items){
+    if(it.kind==="file"){ const f=it.getAsFile(); if(f){ e.preventDefault(); await addFile(f); } }
+  }
+});
+chatInput.addEventListener("input",()=>{ chatInput.style.height="auto"; chatInput.style.height=Math.min(200,chatInput.scrollHeight)+"px"; });
+chatInput.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } });
+sendBtn.onclick=send;
+// drag & drop
+chatLogEl.addEventListener("dragover",e=>e.preventDefault());
+chatLogEl.addEventListener("drop",async e=>{ e.preventDefault(); for(const f of e.dataTransfer.files) await addFile(f); });
+
+/* =========================================================
+   LOG VIEW
+   ========================================================= */
+function pctClass(p){ return p>=90?"hi":p>=70?"mid":"lo" }
+function renderUsage(){
+  const grid=document.getElementById("usageGrid"); grid.innerHTML="";
+  PROVIDERS.forEach(p=>{
+    const c=cfg[p.id], u=usage[p.id];
+    const card=document.createElement("div"); card.className="ucard"+(p.warn?" warnprov":"");
+    let h=`<h3>${esc(p.name)} ${p.warn?"<span class='privacy'>⚠ 유출주의</span>":""}</h3>`;
+    h+=`<div class='sub'>집계: ${p.aggregation==="account"?"계정 합산":"모델별 구분"} · 기준: ${p.primary==="tokens"?"토큰":"요청 수"} · 순서 ${c.order||0}${(c.order||0)===0?" (제외)":""}</div>`;
+    if(p.aggregation==="account"){
+      const info=limitInfo(p.id, c.model);
+      h+=`<div class='urow'><span class='k'>요청 수</span><span>${u.requests.toLocaleString()}</span></div>`;
+      h+=`<div class='urow'><span class='k'>예상 토큰</span><span>${u.tokens.toLocaleString()}</span></div>`;
+      h+=`<div class='urow'><span class='k'>한도(${info.type})</span><span>${info.max?info.max.toLocaleString():"∞"}</span></div>`;
+      h+=`<div class='urow'><span class='k'>소진율</span><span class='pct ${pctClass(info.pct)}'>${info.pct.toFixed(1)}%</span></div>`;
+      h+=`<div class='minibar'><i class='${pctClass(info.pct)}' style='width:${info.pct}%'></i></div>`;
+    }else{
+      p.models.forEach(m=>{
+        const mu=(u.models[m.id]||{requests:0,tokens:0});
+        const info=limitInfo(p.id, m.id);
+        h+=`<div class='modelblock'><div class='mname'>${esc(m.id)}</div>`;
+        h+=`<div class='urow'><span class='k'>요청</span><span>${mu.requests.toLocaleString()} / ${info.max?info.max.toLocaleString():"∞"}</span></div>`;
+        h+=`<div class='urow'><span class='k'>예상 토큰</span><span>${mu.tokens.toLocaleString()}</span></div>`;
+        h+=`<div class='urow'><span class='k'>소진율</span><span class='pct ${pctClass(info.pct)}'>${info.pct.toFixed(1)}%</span></div>`;
+        h+=`<div class='minibar'><i class='${pctClass(info.pct)}' style='width:${info.pct}%'></i></div></div>`;
+      });
+    }
+    card.innerHTML=h; grid.appendChild(card);
+  });
+}
+function renderLogLines(){
+  const box=document.getElementById("logLines");
+  box.innerHTML = logs.map(l=>`<div class='ll ${l.type}'><span class='t'>[${esc(l.t)}]</span> ${esc(l.text)}</div>`).join("");
+  box.scrollTop=box.scrollHeight;
+  document.getElementById("logCount").textContent=logs.length+" 줄";
+}
+document.getElementById("copyAll").onclick=()=>{
+  navigator.clipboard.writeText(logs.map(l=>`[${l.t}] ${l.text}`).join("\n"));
+  toast("ok","복사됨","전체 로그 "+logs.length+"줄");
+};
+document.getElementById("copy100").onclick=()=>{
+  const last=logs.slice(-100);
+  navigator.clipboard.writeText(last.map(l=>`[${l.t}] ${l.text}`).join("\n"));
+  toast("ok","복사됨","최근 "+last.length+"줄");
+};
+document.getElementById("clearLog").onclick=()=>{ logs=[]; save(LS.logs,logs); renderLogLines(); };
+
+/* =========================================================
+   SETTINGS VIEW
+   ========================================================= */
+function renderSettings(){
+  const wrap=document.getElementById("setCards"); wrap.innerHTML="";
+  PROVIDERS.forEach((p,idx)=>{
+    const c=cfg[p.id];
+    const card=document.createElement("div"); card.className="pcard"+(p.warn?" warnprov":"");
+    let h=`<div class='head'>
+        <span class='light' id='light-${p.id}'></span>
+        <h3>${esc(p.name)} ${p.warn?"<span class='privacy'>⚠ 데이터 유출 주의</span>":""}</h3>
+        <span class='pid'>${idx+1}. ${p.id}${p.kind==="gemini"?" / gemini":""}</span>
+      </div>`;
+    if(p.privacy) h+=`<div class='hint privacy' style='margin-bottom:8px'>${esc(p.privacy)}</div>`;
+    h+=`<div class='frow'><label>API 키</label>
+        <input type='password' id='key-${p.id}' value='${esc(c.key)}' placeholder='${esc(p.name)} API Key'>
+      </div>`;
+    if(p.needsAccount) h+=`<div class='frow'><label>Account ID</label>
+        <input type='text' id='acc-${p.id}' value='${esc(c.account)}' placeholder='Cloudflare Account ID'></div>`;
+    h+=`<div class='frow'><label>기본 모델</label>
+        <select id='mdl-${p.id}'>${p.models.map(m=>`<option value='${esc(m.id)}' ${c.model===m.id?"selected":""}>${esc(m.id)}</option>`).join("")}</select>
+        <label style='min-width:50px'>순서</label>
+        <input type='number' id='ord-${p.id}' value='${c.order}' min='0' title='0=제외'>
+      </div>`;
+    // limits
+    if(p.aggregation==="account"){
+      const lim=c.limits;
+      h+=`<div class='limitrow'>
+        <div class='li'><span>일 요청 한도(RPD)</span><input type='number' id='lr-${p.id}' value='${lim.rpd||0}'></div>
+        <div class='li'><span>일 토큰 한도(TPD)</span><input type='number' id='lt-${p.id}' value='${lim.tpd||0}'></div>
+        <span class='hint'>기준: ${p.primary==="tokens"?"토큰(TPD)":"요청(RPD)"} · 0이면 무제한</span>
+      </div>`;
+    }else{
+      h+=`<div class='hint' style='margin-top:6px'>모델별 한도 (기준: ${p.primary==="tokens"?"토큰":"요청"}):</div>`;
+      p.models.forEach(m=>{
+        const ml=c.modelLimits[m.id]||{};
+        h+=`<div class='limitrow'>
+          <div class='li'><span style='color:var(--accent2)'>${esc(m.id)}</span></div>
+          <div class='li'><span>RPD</span><input type='number' id='mlr-${p.id}-${esc(m.id)}' value='${ml.rpd||0}'></div>
+          <div class='li'><span>TPD</span><input type='number' id='mlt-${p.id}-${esc(m.id)}' value='${ml.tpd||0}'></div>
+        </div>`;
+      });
+    }
+    h+=`<div class='frow' style='margin-top:10px;margin-bottom:0'>
+        <button class='savebtn' id='save-${p.id}'>저장 + 호출 테스트</button>
+        <button class='testbtn' id='test-${p.id}'>테스트만</button>
+        <span class='hint'>키 발급: <a href='${p.keyUrl}' target='_blank' rel='noopener'>${p.keyUrl}</a></span>
+      </div>`;
+    card.innerHTML=h; wrap.appendChild(card);
+
+    // restore light state
+    const lightState=c.lastTest;
+    if(lightState) document.getElementById("light-"+p.id).className="light "+lightState;
+
+    document.getElementById("save-"+p.id).onclick=()=>saveProvider(p, true);
+    document.getElementById("test-"+p.id).onclick=()=>{ saveProvider(p, false, true); };
+  });
+}
+
+function readProviderForm(p){
+  const c=cfg[p.id];
+  c.key=document.getElementById("key-"+p.id).value.trim();
+  if(p.needsAccount) c.account=document.getElementById("acc-"+p.id).value.trim();
+  c.model=document.getElementById("mdl-"+p.id).value;
+  c.order=parseInt(document.getElementById("ord-"+p.id).value)||0;
+  if(p.aggregation==="account"){
+    c.limits.rpd=parseInt(document.getElementById("lr-"+p.id).value)||0;
+    c.limits.tpd=parseInt(document.getElementById("lt-"+p.id).value)||0;
+  }else{
+    p.models.forEach(m=>{
+      c.modelLimits[m.id]={
+        rpd:parseInt(document.getElementById("mlr-"+p.id+"-"+m.id).value)||0,
+        tpd:parseInt(document.getElementById("mlt-"+p.id+"-"+m.id).value)||0
+      };
+    });
+  }
+  saveCfg();
+}
+
+async function saveProvider(p, doTest, testOnly){
+  readProviderForm(p);
+  if(!testOnly) toast("ok","저장됨", p.name+" 설정이 저장되었습니다.");
+  syncTopSelectors(); updateStatus();
+  if(!doTest && !testOnly){ return; }
+
+  const c=cfg[p.id];
+  const light=document.getElementById("light-"+p.id);
+  if(!c.key){
+    light.className="light bad"; c.lastTest="bad"; saveCfg();
+    toast("bad", p.name+" 테스트 실패","API 키가 비어 있습니다.");
+    logLine("err", `테스트 [${p.name}] 키 없음`);
+    return;
+  }
+  if(p.needsAccount && !c.account){
+    light.className="light bad"; c.lastTest="bad"; saveCfg();
+    toast("bad", p.name+" 테스트 실패","Account ID가 필요합니다.");
+    return;
+  }
+  light.className="light test";
+  logLine("sys", `테스트 호출 → ${p.name} / ${c.model}`);
+  try{
+    const out=await callProvider(p.id, c.model, [{role:"user", text:"ping (한 단어로만 'pong' 이라고 답해줘)"}]);
+    light.className="light ok"; c.lastTest="ok"; saveCfg();
+    recordUsage(p.id, c.model, out.tokens||5);
+    toast("ok", p.name+" 정상", "키가 정상 동작합니다. 응답: "+(out.text||"").slice(0,40));
+    logLine("ok", `테스트 성공 [${p.name}] 응답: ${(out.text||"").slice(0,60)}`);
+    if(curView==="log") renderUsage();
+  }catch(err){
+    light.className="light bad"; c.lastTest="bad"; saveCfg();
+    const msg=err.msg||String(err);
+    toast("bad", p.name+" 키 비정상", msg.slice(0,140));
+    logLine("err", `테스트 실패 [${p.name}] ${err.kind||""}: ${msg}`);
+  }
+  updateStatus();
+}
+
+document.getElementById("warnPct").value=glob.warnPct;
+document.getElementById("warnPct").onchange=function(){ glob.warnPct=parseInt(this.value)||80; saveGlob(); updateStatus(); };
+document.getElementById("resetUsage").onclick=()=>{
+  usage=freshUsage(); saveUsage();
+  PROVIDERS.forEach(p=>{ cfg[p.id].lastTest=null });
+  toast("ok","초기화","오늘 사용량을 초기화했습니다.");
+  if(curView==="log") renderUsage(); updateStatus();
+};
+
+/* =========================================================
+   VIEW SWITCH
+   ========================================================= */
+let curView="chat";
+function switchView(v){
+  curView=v;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.view===v));
+  document.querySelectorAll(".view").forEach(s=>s.classList.remove("active"));
+  ({chat:"chatView",log:"logView",set:"setView",ed:"edView"})[v];
+  document.getElementById(({chat:"chatView",log:"logView",set:"setView",ed:"edView"})[v]).classList.add("active");
+  if(v==="log"){ renderUsage(); renderLogLines(); }
+  if(v==="set"){ renderSettings(); }
+}
+document.querySelectorAll(".tab").forEach(t=> t.onclick=()=>switchView(t.dataset.view));
+
+/* =========================================================
+   FUTURE EDITOR MODULE (internal shell only)
+   ========================================================= */
+window.__editorModule = {
+  ready:false,
+  files:{},                       // 향후 파일 트리
+  open(path){ /* TODO: open file in editor */ },
+  requestAICompletion(ctx){       // 향후 AI 코딩 지원 훅 — 기존 provider 호출 재사용
+    return callProvider(active.pid, active.model, [{role:"user",text:ctx}]);
+  },
+  mount(){ /* TODO: mount Monaco/CodeMirror-like editor into #edView */ }
+};
+
+/* =========================================================
+   INIT
+   ========================================================= */
+function init(){
+  // validate active provider exists & enabled
+  if(!PROV[active.pid]) active={pid:"gemini",model:PROV.gemini.models[0].id};
+  if(!cfg[active.pid].model) cfg[active.pid].model=PROV[active.pid].models[0].id;
+  active.model=cfg[active.pid].model;
+  document.getElementById("autoToggle").classList.toggle("on", glob.autoMode);
+  const encT=document.getElementById("encToggle");
+  encT.classList.toggle("on", glob.encodeCode);
+  encT.onclick=function(){ glob.encodeCode=!glob.encodeCode; this.classList.toggle("on",glob.encodeCode); saveGlob();
+    toast("ok","인코딩 규칙", glob.encodeCode?"켜짐 — 코드 블록을 ÷ 규칙으로 인코딩/.txt 저장합니다.":"꺼짐 — 일반 복사로 돌아갑니다.");
+    if(curView==="chat"){ /* 새 메시지부터 적용 */ } };
+  syncTopSelectors();
+  updateStatus();
+  logLine("sys","AI Console 시작됨 · "+today());
+  // periodic daily reset check
+  setInterval(()=>{ if(usage.date!==today()){ usage=freshUsage(); saveUsage(); updateStatus(); if(curView==="log") renderUsage(); logLine("sys","날짜 변경 → 사용량 초기화"); } }, 60000);
+}
+init();
+</script>
+</body>
+</html>
